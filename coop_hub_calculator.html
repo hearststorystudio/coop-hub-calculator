@@ -1760,6 +1760,8 @@ if(!loadProgress()){
 // ══════════════════════════════════════════════════════
 
 const WF_TEMPLATES = {
+  'Presented by':           { key:'presented-by',       label:'Presented by',                 desc:'Sponsor logo lockup on the hub hero banner' },
+  'Sponsor Information Card':{ key:'sponsor-info-card', label:'Sponsor Information Card',     desc:'Thumbnail image with popup card for each sponsor' },
   'Featured Story Placement':{ key:'featured-stories', label:'Featured Stories',              desc:'2-column editorial cards with image, headline, sponsor tag' },
   'Featured Listing':        { key:'featured-listings',label:'Featured Listings',             desc:'4-column partner cards with image placeholder and name' },
   'Read More':               { key:'read-more',        label:'Read More / Editorial Stories', desc:'Editorial stories from partners or station' },
@@ -1793,7 +1795,7 @@ let wfPlacements = [];
 let wfCurrentHtml = '';
 let wfChatHistory = [];
 let wfDragSrc = null;
-let wfShowPresentedBy = true;
+
 
 // ── Open / Close ──────────────────────────────────────
 function openWireframeStudio() {
@@ -1869,15 +1871,7 @@ function openWireframeStudio() {
   const regenBtn = document.getElementById('wfRegenerateBtn');
   if (genBtn) { genBtn.style.display = 'flex'; genBtn.disabled = false; genBtn.style.opacity = '1'; }
   if (regenBtn) { regenBtn.style.display = 'none'; }
-  // Sync "Presented by" from calculator — true if any active package has it active
-  wfShowPresentedBy = (function(){
-    if(typeof pkgs==='undefined'||!pkgs.length) return true;
-    return pkgs.some(function(pkg){
-      return (pkg.inclusions||[]).some(function(inc){
-        return inc.name==='Presented by' && inc.active!==false;
-      });
-    });
-  })();
+
   wfCurrentHtml = '';
   wfChatHistory = [];
 }
@@ -1921,7 +1915,7 @@ function renderWfPlacements() {
             <span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--border);border-radius:3px;padding:1px 5px;flex-shrink:0;">Default</span>
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:1px;line-height:1.3;opacity:.7;">${p.desc}</div>
-          ${p.key === 'hero-banner' ? `<label style="display:inline-flex;align-items:center;gap:5px;margin-top:5px;cursor:pointer;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;"><input type="checkbox" ${wfShowPresentedBy?'checked':''} onchange="wfShowPresentedBy=this.checked;" style="cursor:pointer;"> Presented by lockup</label>` : ''}
+
         </div>
       `;
       list.appendChild(el);
@@ -2091,6 +2085,9 @@ const WF_SHARED_CSS = `<style>
 .wf-dark .wf-h1[contenteditable]:hover{border-bottom-color:rgba(255,255,255,.2);}
 .wf-h1[contenteditable]:focus{border-bottom-color:#888;}
 .wf-dark .wf-h1[contenteditable]:focus{border-bottom-color:rgba(255,255,255,.5);}
+[contenteditable]:not(.wf-h1):not(.wf-h2){outline:none;cursor:text;border-bottom:1px dashed transparent;transition:border-color .15s;}
+[contenteditable]:not(.wf-h1):not(.wf-h2):hover{border-bottom-color:rgba(0,0,0,.12);}
+[contenteditable]:not(.wf-h1):not(.wf-h2):focus{border-bottom-color:#aaa;}
 .wf-assist-btn{position:absolute;top:50%;transform:translateY(-50%);right:-22px;width:16px;height:16px;border-radius:50%;border:1.5px solid #ccc;background:#fff;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:9px;font-weight:700;color:#bbb;line-height:1;z-index:10;transition:all .15s;}
 .wf-editable-wrap:hover .wf-assist-btn{display:flex;}
 .wf-assist-btn:hover{border-color:#888;color:#444;background:#f5f5f5;}
@@ -2188,7 +2185,7 @@ function tplNav(ctx) {
 }
 
 function tplFooter(ctx) {
-  const hub  = ctx.hub     || 'Co-op Hub';
+  const hub  = ctx.hub ? toTitleCase(ctx.hub.trim()) + ' Co-op Hub' : 'Co-op Hub';
   const sta  = ctx.station || 'Station';
   return `
 <div class="wf-footer">
@@ -2222,13 +2219,43 @@ function tplHero(ctx) {
       <div class="wf-btn wf-btn-fill wf-btn-sm" style="border-color:#fff;background:#fff;color:#1a1a1a;">Explore Now</div>
       <div class="wf-btn wf-btn-sm" style="border-color:#666;color:#999;">Learn More</div>
     </div>
-    ${wfShowPresentedBy ? `<div style="border-top:1px solid #555;padding-top:28px;width:100%;display:flex;flex-direction:column;align-items:center;gap:16px;">
-      <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#bbb;font-weight:700;">Presented by</div>
-      <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
-        ${[1,2,3].map(n=>'<div style="width:110px;height:44px;border:1.5px dashed #999;background:rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;"><div style="width:40px;height:2px;background:#999;border-radius:1px;"></div><div style="font-size:8px;color:#aaa;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">SPONSOR LOGO '+n+'</div></div>').join('')}
-      </div>
-    </div>` : ''}
+
   </div>
+</div>`;
+}
+
+function tplPresentedBy(ctx) {
+  return `
+<div class="wf-section" style="padding:24px 48px;">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#aaa;font-weight:700;flex-shrink:0;">Presented by</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+      ${[1,2,3].map(n=>`<div style="width:100px;height:40px;border:1.5px dashed #ccc;background:#fafafa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;"><div style="width:36px;height:2px;background:#ccc;border-radius:1px;"></div><div style="font-size:7px;color:#ccc;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">LOGO ${n}</div></div>`).join('')}
+    </div>
+  </div>
+</div>`;
+}
+
+function tplSponsorInfoCard(ctx) {
+  const hub = ctx.hub ? ctx.hub.trim() : 'Your Hub';
+  const card = (n) => `
+    <div style="display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid #e8e8e8;background:#fff;">
+      <div class="wf-img" style="width:80px;height:80px;flex-shrink:0;"><span class="wf-img-lbl" style="font-size:8px;">IMG</span></div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1a1a1a;margin-bottom:5px;" contenteditable="true" spellcheck="false">Sponsor Name ${n}</div>
+        <div style="font-size:11px;color:#888;line-height:1.5;margin-bottom:8px;" contenteditable="true" spellcheck="false">Short description of sponsor — up to 100 words, relevant to the hub topic and audience.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div class="wf-btn wf-btn-sm" style="font-size:9px;padding:4px 10px;border-color:#ccc;color:#888;">Website ↗</div>
+          <div class="wf-btn wf-btn-sm" style="font-size:9px;padding:4px 10px;border-color:#ccc;color:#888;">Contact</div>
+        </div>
+      </div>
+    </div>`;
+  return `
+<div class="wf-section">
+  <div class="wf-divider"></div>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">SPONSOR INFORMATION</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">Learn more about each sponsor — click to visit their site or get in touch.</p>
+  <div style="display:flex;flex-direction:column;gap:12px;">${[1,2,3].map(card).join('')}</div>
 </div>`;
 }
 
@@ -2239,14 +2266,14 @@ function tplFeaturedStories(ctx) {
       <div class="wf-img" style="height:160px;"><span class="wf-img-lbl">[ IMAGE ]</span></div>
       <div class="wf-card-body">
         <div class="wf-tag">Sponsored</div>
-        <div class="wf-card-hed">Headline for Sponsored Story #${n}</div>
+        <div class="wf-card-hed" contenteditable="true" spellcheck="false">Headline for Sponsored Story #${n}</div>
         <div class="wf-lorem"></div><div class="wf-lorem wf-sm"></div>
       </div>
     </div>`;
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
   <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-2">${[1,2,3,4].map(card).join('')}</div>
 </div>`;
@@ -2262,8 +2289,8 @@ function tplFeaturedListings(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-4" style="margin-bottom:16px;">${Array(4).fill(0).map(card).join('')}</div>
   <div class="wf-grid-4">${Array(4).fill(0).map(card).join('')}</div>
 </div>`;
@@ -2276,15 +2303,15 @@ function tplReadMore(ctx) {
       <div class="wf-img" style="height:140px;"><span class="wf-img-lbl">[ IMAGE ]</span></div>
       <div class="wf-card-body">
         <div class="wf-tag">Editorial</div>
-        <div class="wf-card-hed">Headline for Editorial Story #${n}</div>
+        <div class="wf-card-hed" contenteditable="true" spellcheck="false">Headline for Editorial Story #${n}</div>
         <div class="wf-lorem"></div><div class="wf-lorem wf-sm"></div>
       </div>
     </div>`;
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-2">${[1,2].map(card).join('')}</div>
 </div>`;
 }
@@ -2310,8 +2337,8 @@ function tplQaFaq(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div>
     ${items.map((q,i)=>`
     <div class="wf-accordion-item" ${i===0?'style="border-top:1px solid #e8e8e8;"':''}>
@@ -2333,8 +2360,8 @@ function tplDirectory(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-4" style="margin-bottom:16px;">${Array(4).fill(0).map(logo).join('')}</div>
   <div class="wf-grid-4">${Array(4).fill(0).map(logo).join('')}</div>
 </div>`;
@@ -2346,8 +2373,8 @@ function tplIeMap(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-map-wrap" style="grid-template-columns:300px 1fr;">
     <div class="wf-map-list" style="border-left:none;border-right:1px solid #e8e8e8;">
       ${Array(5).fill(0).map((_,i)=>`
@@ -2374,8 +2401,8 @@ function tplIeUpcomingEvents(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-3" style="margin-bottom:16px;">
     ${days.slice(0,3).map((d,i)=>`
     <div class="wf-event-card">
@@ -2406,8 +2433,8 @@ function tplIeQuiz(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;padding:28px;">
     <div style="font-size:10px;color:#bbb;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;">Question 1 of 5</div>
     <div style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:20px;text-transform:uppercase;letter-spacing:.03em;">How would you describe your needs?</div>
@@ -2431,8 +2458,8 @@ function tplIeCalculator(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;">
     <div>
       ${['Your Budget','Down Payment','Loan Term','ZIP Code'].map(lbl=>`
@@ -2464,8 +2491,8 @@ function tplIeTimeline(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-ie" style="padding:36px 40px;align-items:flex-start;">
     <div class="wf-timeline" style="width:100%;">
       ${years.map((y,i)=>`
@@ -2485,8 +2512,8 @@ function tplIeInfoCards(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-4">
     ${[1,2,3,4].map((n,i)=>`
     <div class="wf-info-card" style="${i===1?'background:#1a1a1a;border-color:#1a1a1a;':''}">
@@ -2506,8 +2533,8 @@ function tplIeShoppableImages(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;">
     <div class="wf-shop-wrap">
       <div class="wf-img" style="height:340px;width:100%;"><span class="wf-img-lbl">[ SHOPPABLE IMAGE ]</span></div>
@@ -2555,8 +2582,8 @@ function tplIeIllustrations(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div style="border:1px solid #e0e0e0;background:#fff;padding:28px;">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
       ${[120,90,100].map(ht=>`<div class="wf-img" style="height:${ht}px;"><span class="wf-img-lbl">[ GRAPHIC ]</span></div>`).join('')}
@@ -2591,8 +2618,8 @@ function tplIeShoppableVideo(ctx) {
     </div>
   </div>
   <div class="wf-section" style="padding:20px 48px;">
-    <h2 class="wf-h1" style="font-size:18px;">${h.h1}</h2>
-    <p class="wf-h2" style="margin-bottom:0;">${h.h2}</p>
+    <h2 class="wf-h1" style="font-size:18px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+    <p class="wf-h2" style="margin-bottom:0;" contenteditable="true" spellcheck="false">${h.h2}</p>
   </div>
 </div>`;
 }
@@ -2602,8 +2629,8 @@ function tplIeAnimatedVideo(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div style="position:relative;border:1px solid #e0e0e0;background:#fff;">
     <div class="wf-img" style="height:320px;">
       <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
@@ -2634,7 +2661,7 @@ function tplIeShowreel(ctx) {
   <div class="wf-ie" style="padding:0;min-height:320px;position:relative;">
     <div class="wf-img" style="width:100%;height:320px;"></div>
     <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:32px 48px 24px;">
-      <h2 class="wf-h1" style="font-size:22px;color:#fff;">${h.h1}</h2>
+      <h2 class="wf-h1" style="font-size:22px;color:#fff;" contenteditable="true" spellcheck="false">${h.h1}</h2>
       <p style="color:#666;font-size:12px;margin-top:6px;">${h.h2}</p>
     </div>
     <div style="position:absolute;top:50%;right:48px;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;">
@@ -2656,8 +2683,8 @@ function tplIeChatbot(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
-  <p class="wf-h2">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-chat-window">
     <div class="wf-chat-header">
       <div class="wf-chat-avatar"></div>
@@ -2706,6 +2733,8 @@ const WF_RENDER = {
   'nav':                  tplNav,
   'footer':               tplFooter,
   'hero-banner':          tplHero,
+  'presented-by':         tplPresentedBy,
+  'sponsor-info-card':    tplSponsorInfoCard,
   'featured-stories':     tplFeaturedStories,
   'featured-listings':    tplFeaturedListings,
   'read-more':            tplReadMore,
