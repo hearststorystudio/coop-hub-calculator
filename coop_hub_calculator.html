@@ -1722,7 +1722,7 @@ if(!loadProgress()){
 
       <!-- Generate button -->
       <div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--off);flex-shrink:0;">
-        <button id="wfGenerateBtn" onclick="generateWireframe()" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:6px;padding:12px 10px;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;" onmouseover="this.style.background='#162d5e'" onmouseout="this.style.background='var(--navy)'">
+        <button id="wfGenerateBtn" onclick="generateWireframe()" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:6px;padding:12px 10px;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;transition:all .2s;display:none;align-items:center;justify-content:center;gap:8px;" onmouseover="this.style.background='#162d5e'" onmouseout="this.style.background='var(--navy)'">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="8" height="2" rx=".7" fill="currentColor" opacity=".7"/><rect x="3" y="6.5" width="5" height="1.5" rx=".5" fill="currentColor" opacity=".5"/><rect x="3" y="9" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".35"/></svg>
           Generate Wireframe
         </button>
@@ -1796,6 +1796,29 @@ let wfCurrentHtml = '';
 let wfChatHistory = [];
 let wfDragSrc = null;
 
+// ── Wireframe state persistence ───────────────────────────────────────────────
+function wfStateKey() {
+  const hub = (document.getElementById('hubName')||{}).value || '';
+  const sta = (document.getElementById('station')||{}).value || '';
+  return 'wfState_' + hub + '_' + sta;
+}
+function saveWfState() {
+  try {
+    // Save placement order + active state (exclude locked items — always rebuilt)
+    const saveable = wfPlacements
+      .filter(p => !p.locked)
+      .map(p => ({ key: p.key, active: p.active, label: p.label, desc: p.desc,
+                   custom: p.custom, customHtml: p.customHtml || null }));
+    localStorage.setItem(wfStateKey(), JSON.stringify(saveable));
+  } catch(e) {}
+}
+function loadWfState() {
+  try {
+    const raw = localStorage.getItem(wfStateKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
 
 // ── Open / Close ──────────────────────────────────────
 function openWireframeStudio() {
@@ -1855,24 +1878,40 @@ function openWireframeStudio() {
   // Footer always last
   wfPlacements.push({...WF_LOCKED[2]});
 
+  // ── Restore saved placement state (order + active) if it exists ──────────
+  const saved = loadWfState();
+  if (saved && saved.length > 0) {
+    const nav    = wfPlacements.find(p => p.key === 'nav');
+    const hero   = wfPlacements.find(p => p.key === 'hero-banner');
+    const footer = wfPlacements.find(p => p.key === 'footer');
+    const currentMap = {};
+    wfPlacements.filter(p => !p.locked).forEach(p => { currentMap[p.key] = p; });
+    const savedKeys = new Set(saved.map(s => s.key));
+    const newKeys = wfPlacements.filter(p => !p.locked && !savedKeys.has(p.key));
+    wfPlacements = [
+      nav, hero,
+      ...saved.map(s => {
+        const cur = currentMap[s.key];
+        if (!cur) return null;
+        return { ...cur, active: s.active, customHtml: s.customHtml || cur.customHtml };
+      }).filter(Boolean),
+      ...newKeys,
+      footer
+    ];
+  }
+
   renderWfPlacements();
   document.getElementById('wfOverlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  // Reset output
-  document.getElementById('wfOutput').style.display = 'none';
-  document.getElementById('wfOutput').innerHTML = '';
-  document.getElementById('wfEmptyState').style.display = 'block';
+  // Show output area, hide empty state
+  document.getElementById('wfOutput').style.display = 'block';
   document.getElementById('wfJpgBtn').style.display = 'none';
   document.getElementById('wfGenStatus').textContent = '';
-  const driveBtn = document.getElementById('wfViewInDriveBtn');
-  if (driveBtn) { driveBtn.style.display = 'none'; driveBtn.href = '#'; }
-  // Reset to initial Generate state
-  const genBtn = document.getElementById('wfGenerateBtn');
-  const regenBtn = document.getElementById('wfRegenerateBtn');
-  if (genBtn) { genBtn.style.display = 'flex'; genBtn.disabled = false; genBtn.style.opacity = '1'; }
-  if (regenBtn) { regenBtn.style.display = 'none'; }
+  const emptyEl2 = document.getElementById('wfEmptyState');
+  if (emptyEl2) emptyEl2.style.display = 'none';
 
-  wfCurrentHtml = '';
+  // ── Auto-generate immediately ───────────────────────────────────────────────
+  generateWireframe();
   wfChatHistory = [];
 }
 
@@ -1983,6 +2022,7 @@ function wfToggle(idx) {
   if (wfPlacements[idx].locked) return;
   wfPlacements[idx].active = !wfPlacements[idx].active;
   renderWfPlacements();
+  generateWireframe();
 }
 
 // ── Drag-to-reorder ───────────────────────────────────
@@ -2004,6 +2044,7 @@ function wfDrop(e) {
   const moved = wfPlacements.splice(wfDragSrc, 1)[0];
   wfPlacements.splice(targetIdx, 0, moved);
   renderWfPlacements();
+  generateWireframe();
   return false;
 }
 function wfDragEnd(e) {
@@ -2761,14 +2802,9 @@ function generateWireframe() {
     return;
   }
 
-  // Disable whichever button is currently visible
-  const regenBtnActive = document.getElementById('wfRegenerateBtn');
-  const btn = regenBtnActive && regenBtnActive.style.display !== 'none'
-    ? regenBtnActive
-    : document.getElementById('wfGenerateBtn');
   const statusEl = document.getElementById('wfGenStatus');
 
-  document.getElementById('wfEmptyState').style.display = 'none';
+  const emptyEl = document.getElementById('wfEmptyState'); if (emptyEl) emptyEl.style.display = 'none';
   const outputEl = document.getElementById('wfOutput');
   outputEl.style.display = 'block';
 
@@ -2803,11 +2839,8 @@ function generateWireframe() {
   statusEl.style.color = 'var(--good)';
   document.getElementById('wfJpgBtn').style.display = 'inline-flex';
 
-  // After first generation: hide Generate, show Regenerate
-  const genBtn = document.getElementById('wfGenerateBtn');
-  const regenBtn = document.getElementById('wfRegenerateBtn');
-  if (genBtn) genBtn.style.display = 'none';
-  if (regenBtn) { regenBtn.style.display = 'flex'; regenBtn.disabled = false; regenBtn.style.opacity = '1'; }
+  // Save state so it persists across calculator round-trips
+  saveWfState();
 }
 
 function tplCustomPlaceholder(p, ctx) {
@@ -2983,12 +3016,7 @@ Requirements:
   }, 600);
 }
 
-function resetWfGenerateBtn() {
-  const btn = document.getElementById('wfGenerateBtn');
-  btn.disabled = false;
-  btn.style.opacity = '1';
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="8" height="2" rx=".7" fill="currentColor" opacity=".7"/><rect x="3" y="6.5" width="5" height="1.5" rx=".5" fill="currentColor" opacity=".5"/><rect x="3" y="9" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".35"/></svg> Regenerate`;
-}
+function resetWfGenerateBtn() { /* buttons removed — auto-generates on all interactions */ }
 
 // ════════════════════════════════════════════════════
 // JPG EXPORT → GDRIVE
