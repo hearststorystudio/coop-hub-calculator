@@ -2204,34 +2204,28 @@ function tplFooter(ctx) {
 </div>`;
 }
 
-function tplHero(ctx) {
+function tplHero(ctx, showPresentedBy) {
   const h       = wfHeading(ctx,'hero');
-  // Use tagline if available, then first sentence of desc, then empty
   const subhead = ctx.tagline
     || (ctx.desc ? ctx.desc.split('.')[0].trim() + '.' : '');
+  const pbLockup = showPresentedBy ? `
+    <div style="border-top:1px solid #444;margin-top:36px;padding-top:24px;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#aaa;font-weight:700;" contenteditable="true" spellcheck="false">Presented by</div>
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+        ${[1,2,3].map(n=>`<div style="width:110px;height:44px;border:1.5px dashed #666;background:rgba(255,255,255,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;"><div style="width:36px;height:2px;background:#666;border-radius:1px;"></div><div style="font-size:7px;color:#888;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">LOGO ${n}</div></div>`).join('')}
+      </div>
+    </div>` : '';
   return `
 <div class="wf-section wf-dark" style="padding:0;min-height:440px;position:relative;display:flex;flex-direction:column;">
   <div class="wf-img" style="position:absolute;inset:0;opacity:.14;"></div>
   <div style="position:relative;z-index:1;padding:72px 48px 52px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
     <h1 class="wf-h1" contenteditable="true" spellcheck="false" style="font-size:44px;max-width:600px;margin-bottom:14px;">${h.h1}</h1>
     <p class="wf-h2" contenteditable="true" spellcheck="false" style="max-width:420px;margin-bottom:36px;font-size:15px;color:#888;">${subhead}</p>
-    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:52px;">
+    <div style="display:flex;gap:12px;justify-content:center;">
       <div class="wf-btn wf-btn-fill wf-btn-sm" style="border-color:#fff;background:#fff;color:#1a1a1a;">Explore Now</div>
       <div class="wf-btn wf-btn-sm" style="border-color:#666;color:#999;">Learn More</div>
     </div>
-
-  </div>
-</div>`;
-}
-
-function tplPresentedBy(ctx) {
-  return `
-<div class="wf-section" style="padding:24px 48px;">
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-    <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#aaa;font-weight:700;flex-shrink:0;">Presented by</div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;">
-      ${[1,2,3].map(n=>`<div style="width:100px;height:40px;border:1.5px dashed #ccc;background:#fafafa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;"><div style="width:36px;height:2px;background:#ccc;border-radius:1px;"></div><div style="font-size:7px;color:#ccc;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">LOGO ${n}</div></div>`).join('')}
-    </div>
+    ${pbLockup}
   </div>
 </div>`;
 }
@@ -2733,7 +2727,6 @@ const WF_RENDER = {
   'nav':                  tplNav,
   'footer':               tplFooter,
   'hero-banner':          tplHero,
-  'presented-by':         tplPresentedBy,
   'sponsor-info-card':    tplSponsorInfoCard,
   'featured-stories':     tplFeaturedStories,
   'featured-listings':    tplFeaturedListings,
@@ -2780,13 +2773,19 @@ function generateWireframe() {
   outputEl.style.display = 'block';
 
   const activePlacements = wfPlacements.filter(p => p.active);
+  // Check if "Presented by" is active — it renders inside the hero, not as its own section
+  const showPresentedBy = activePlacements.some(p => p.key === 'presented-by');
   let sectionsHtml = '';
   for (const p of activePlacements) {
+    // Skip presented-by as standalone section — it's injected into the hero
+    if (p.key === 'presented-by') continue;
     if (p.custom && p.customHtml) {
-      // Wrap pasted HTML in the same section constraint all templates use
       sectionsHtml += `<div style="width:100%;max-width:900px;overflow:hidden;border-bottom:1px solid #e8e8e8;">${p.customHtml}</div>`;
     } else if (p.custom) {
       sectionsHtml += tplCustomPlaceholder(p, ctx);
+    } else if (p.key === 'hero-banner') {
+      // Pass showPresentedBy into hero so it can render the lockup inside
+      sectionsHtml += tplHero(ctx, showPresentedBy);
     } else {
       const fn = WF_RENDER[p.key];
       sectionsHtml += fn ? fn(ctx) : tplCustomPlaceholder(p, ctx);
