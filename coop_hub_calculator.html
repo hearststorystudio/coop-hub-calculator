@@ -691,7 +691,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--na
     <div style="display:flex;align-items:center;padding:10px 0 14px;gap:8px;">
       <span style="font-family:'Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);min-width:72px;">Calculator</span>
       <button id="calcDriveBtn" onclick="exportCalcDoc()" style="display:none;align-items:center;gap:7px;padding:9px 16px;background:transparent;color:var(--muted);border:2px solid var(--border);border-radius:6px;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--navy)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 1.5h9v10H2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v7.5M3.5 6l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10v1.5h10V10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Save as Google Doc
       </button>
       <span id="calcDriveStatus" style="font-size:11px;color:var(--muted);font-style:italic;"></span>
@@ -803,6 +803,7 @@ function removeInclusion(pid,idx){const p=pkgs.find(p=>p.id===pid);if(!p)return;
 const standardAddons={dts:{name:'Direct to Site Impressions (100k)',price:1000,active:false},promo:{name:'Promotional Boost (500k imp / 1k eng)',price:3000,active:false}};
 const ADDON_PRICES={dts:1000,promo:3000};
 const DTS_ADDON_COST=1000;
+function parsePrice(v){return parseFloat(String(v||0).replace(/[,$+]/g,''))||0;}
 let sharedCustomAddons=[
   {id:PRESET_ADDON_ID_1,name:'Sponsored Social Post',desc:'Possible promotion of 50–100K impressions',price:'1,500+',preset:true},
   {id:PRESET_ADDON_ID_2,name:'Sponsored Podcast',desc:'Possible promotion of 1M+ impressions',price:'4,500+',preset:true}
@@ -823,14 +824,16 @@ function togglePkgAddon(pkgId,key){
   recalc();
 }
 function recalcPkgRetail(p){
-  // Retail = base + DTS (if active) + active custom add-ons
-  var dtsCost=((p.pkgAddons||{}).dts)?DTS_ADDON_COST:0;
-  var customTotal=sharedCustomAddons.reduce(function(s,a){return s+((p.pkgAddonActive||{})[a.id]?(parseFloat(a.price)||0):0);},0);
-  p.retail=(p.baseRetail||0)+dtsCost+customTotal;
+  // Retail is what the user typed — addons are already factored in by the user.
+  // Only update retail if user hasn't manually set it (baseRetail === 0).
+  if(p.baseRetail>0){
+    p.retail=p.baseRetail;  // preserve what user typed
+  }
+  // else leave retail as-is (default calculations handle it)
 }
 function getAddonTotal(p){
   var dtsCost=((p.pkgAddons||{}).dts)?DTS_ADDON_COST:0;
-  var custom=sharedCustomAddons.reduce(function(s,a){return s+((p.pkgAddonActive||{})[a.id]?(parseFloat(a.price)||0):0);},0);
+  var custom=sharedCustomAddons.reduce(function(s,a){return s+((p.pkgAddonActive||{})[a.id]?parsePrice(a.price):0);},0);
   return dtsCost+custom;
 }
 function addPkgCustomAddon(pkgId){
@@ -857,7 +860,7 @@ function updPkgCustomAddon(pkgId,addonId,field,val){
     }
     recalcPkgRetail(p);render();recalc();
   } else if(a){
-    if(field==='price'){a.price=parseFloat(val)||0;pkgs.forEach(function(p){recalcPkgRetail(p);});recalc();}
+    if(field==='price'){a.price=parsePrice(val);pkgs.forEach(function(p){recalcPkgRetail(p);});recalc();}
     else if(field==='name') a.name=val;
     else if(field==='desc') a.desc=val;
   }
@@ -889,7 +892,7 @@ function addAddon(pr){
   addons.push(a);renderAddons();
 }
 function removeAddon(id){addons=addons.filter(a=>a.id!==id);renderAddons();}
-function updAddon(id,f,v){const a=addons.find(a=>a.id===id);if(!a)return;if(f==='price')a[f]=parseFloat(v)||0;else a[f]=v;}
+function updAddon(id,f,v){const a=addons.find(a=>a.id===id);if(!a)return;if(f==='price')a[f]=parsePrice(v);else a[f]=v;}
 function renderAddons(){
   const list=document.getElementById('addonsList');
   if(!list) return;
@@ -1123,7 +1126,7 @@ function recalc(){hideDeckBtn&&hideDeckBtn();
   }
   if(p.ieActive&&ieCost(p)>0){const _n=seriesLayouts(p);rows+=`<div class="rr-breakdown-row"><span>IE — ${p.ieType} (Level ${p.ieLevel})${_n>1?' × '+_n+' layouts':''}</span><span class="rr-breakdown-val">+$${fmtN(ieCost(p))}</span></div>`;}
   return rows;
-})()}</div>`:''}<div class="rr"><span><span style="display:block">Promo cost</span>${pc>0?`<button class="rr-expand-btn" onclick="(function(btn){var b=btn.closest('.pkg-results').querySelector('.rr-promo-breakdown');var open=b.classList.toggle('open');btn.classList.toggle('open',open);})(this)"><span class="caret">›</span><span>show breakdown</span></button>`:''}</span><span class="rv">$${fmtN(pc)}</span></div>${pc>0?`<div class="rr-breakdown rr-promo-breakdown"><div class="rr-breakdown-row"><span>Impressions</span><span class="rr-breakdown-val">$${fmtN((p.impressions*0.3)/1000)}</span></div><div class="rr-breakdown-row"><span>Engagements</span><span class="rr-breakdown-val">$${fmtN(p.engagements*0.52)}</span></div>${(p.pkgAddons&&p.pkgAddons.dts)?`<div class="rr-breakdown-row"><span>DTS</span><span class="rr-breakdown-val">$${fmtN(DTS_ADDON_COST)}</span></div>`:''}</div>`:''}<div class="rr div" style="padding-top:8px;margin-top:4px"><span class="rr-heading">Total Cost / Client</span><span class="rv" style="font-weight:700;font-size:15px;color:var(--navy)">$${fmtN(tc)}</span></div>${costBarHTML}<div class="field" style="margin-top:12px"><label class="rr-heading" style="font-family:'Barlow',sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);">Retail Cost / Client <span class="print-hide" style="font-size:16px;opacity:.55;display:inline-block;transform:scaleX(-1);" title="Click to edit">✎</span></label><div class="retail-field${r>0?' retail-field-has-value':''}"><input type="number" value="${p.baseRetail||''}" placeholder="e.g. 18000" class="${r>0?' retail-has-value retail-input-hasval':''}" id="retail-${p.id}" onchange="var _p=pkgs.find(p=>p.id===${p.id});if(_p){_p.baseRetail=parseFloat(this.value)||0;recalcPkgRetail(_p);recalc();}" onblur="recalc();" onkeydown="if(event.key==='Enter'){this.blur();}"><div class="retail-print-value" style="display:none;">${r>0?fmtN(r):''}</div>${r>0?'<span class="retail-screen-dollar" onclick="editRetail(this)" style="cursor:pointer">$</span><span class="retail-screen-value" onclick="editRetail(this)" style="cursor:pointer">'+fmtN(r)+'</span>':''}</div></div>${r>0?`<div class="rr" style="margin-top:2px;"><span style="font-size:14px;color:var(--muted);">$${fmtN(mpm)}/mo</span></div><span class="mbadge ${mc}">${(mg*100).toFixed(2)}% Margin</span>`:''}
+})()}</div>`:''}<div class="rr"><span><span style="display:block">Promo cost</span>${pc>0?`<button class="rr-expand-btn" onclick="(function(btn){var b=btn.closest('.pkg-results').querySelector('.rr-promo-breakdown');var open=b.classList.toggle('open');btn.classList.toggle('open',open);})(this)"><span class="caret">›</span><span>show breakdown</span></button>`:''}</span><span class="rv">$${fmtN(pc)}</span></div>${pc>0?`<div class="rr-breakdown rr-promo-breakdown"><div class="rr-breakdown-row"><span>Impressions</span><span class="rr-breakdown-val">$${fmtN((p.impressions*0.3)/1000)}</span></div><div class="rr-breakdown-row"><span>Engagements</span><span class="rr-breakdown-val">$${fmtN(p.engagements*0.52)}</span></div>${(p.pkgAddons&&p.pkgAddons.dts)?`<div class="rr-breakdown-row"><span>DTS</span><span class="rr-breakdown-val">$${fmtN(DTS_ADDON_COST)}</span></div>`:''}</div>`:''}<div class="rr div" style="padding-top:8px;margin-top:4px"><span class="rr-heading">Total Cost / Client</span><span class="rv" style="font-weight:700;font-size:15px;color:var(--navy)">$${fmtN(tc)}</span></div>${costBarHTML}<div class="field" style="margin-top:12px"><label class="rr-heading" style="font-family:'Barlow',sans-serif;font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);">Retail Cost / Client <span class="print-hide" style="font-size:16px;opacity:.55;display:inline-block;transform:scaleX(-1);" title="Click to edit">✎</span></label><div class="retail-field${r>0?' retail-field-has-value':''}"><input type="number" value="${p.baseRetail||''}" placeholder="e.g. 18000" class="${r>0?' retail-has-value retail-input-hasval':''}" id="retail-${p.id}" onchange="var _p=pkgs.find(p=>p.id===${p.id});if(_p){_p.retail=parseFloat(this.value)||0;_p.baseRetail=_p.retail;recalc();}" onblur="recalc();" onkeydown="if(event.key==='Enter'){this.blur();}"><div class="retail-print-value" style="display:none;">${r>0?fmtN(r):''}</div>${r>0?'<span class="retail-screen-dollar" onclick="editRetail(this)" style="cursor:pointer">$</span><span class="retail-screen-value" onclick="editRetail(this)" style="cursor:pointer">'+fmtN(r)+'</span>':''}</div></div>${r>0?`<div class="rr" style="margin-top:2px;"><span style="font-size:14px;color:var(--muted);">$${fmtN(mpm)}/mo</span></div><span class="mbadge ${mc}">${(mg*100).toFixed(2)}% Margin</span>`:''}
 
 `;
   });
@@ -1721,7 +1724,7 @@ if(!loadProgress()){
 
       <!-- Generate button -->
       <div style="padding:14px 18px;border-top:1px solid var(--border);background:var(--off);flex-shrink:0;">
-        <button id="wfGenerateBtn" onclick="generateWireframe()" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:6px;padding:12px 10px;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;transition:all .2s;display:none;align-items:center;justify-content:center;gap:8px;" onmouseover="this.style.background='#162d5e'" onmouseout="this.style.background='var(--navy)'">
+        <button id="wfGenerateBtn" onclick="generateWireframe()" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:6px;padding:12px 10px;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;" onmouseover="this.style.background='#162d5e'" onmouseout="this.style.background='var(--navy)'">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="8" height="2" rx=".7" fill="currentColor" opacity=".7"/><rect x="3" y="6.5" width="5" height="1.5" rx=".5" fill="currentColor" opacity=".5"/><rect x="3" y="9" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".35"/></svg>
           Generate Wireframe
         </button>
@@ -1759,8 +1762,6 @@ if(!loadProgress()){
 // ══════════════════════════════════════════════════════
 
 const WF_TEMPLATES = {
-  'Presented by':           { key:'presented-by',       label:'Presented by',                 desc:'Sponsor logo lockup on the hub hero banner' },
-  'Sponsor Information Card':{ key:'sponsor-info-card', label:'Sponsor Information Card',     desc:'Thumbnail image with popup card for each sponsor' },
   'Featured Story Placement':{ key:'featured-stories', label:'Featured Stories',              desc:'2-column editorial cards with image, headline, sponsor tag' },
   'Featured Listing':        { key:'featured-listings',label:'Featured Listings',             desc:'4-column partner cards with image placeholder and name' },
   'Read More':               { key:'read-more',        label:'Read More / Editorial Stories', desc:'Editorial stories from partners or station' },
@@ -1794,30 +1795,7 @@ let wfPlacements = [];
 let wfCurrentHtml = '';
 let wfChatHistory = [];
 let wfDragSrc = null;
-
-// ── Wireframe state persistence ───────────────────────────────────────────────
-function wfStateKey() {
-  const hub = (document.getElementById('hubName')||{}).value || '';
-  const sta = (document.getElementById('station')||{}).value || '';
-  return 'wfState_' + hub + '_' + sta;
-}
-function saveWfState() {
-  try {
-    // Save placement order + active state (exclude locked items — always rebuilt)
-    const saveable = wfPlacements
-      .filter(p => !p.locked)
-      .map(p => ({ key: p.key, active: p.active, label: p.label, desc: p.desc,
-                   custom: p.custom, customHtml: p.customHtml || null }));
-    localStorage.setItem(wfStateKey(), JSON.stringify(saveable));
-  } catch(e) {}
-}
-function loadWfState() {
-  try {
-    const raw = localStorage.getItem(wfStateKey());
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
-}
-
+let wfShowPresentedBy = true;
 
 // ── Open / Close ──────────────────────────────────────
 function openWireframeStudio() {
@@ -1877,40 +1855,32 @@ function openWireframeStudio() {
   // Footer always last
   wfPlacements.push({...WF_LOCKED[2]});
 
-  // ── Restore saved placement state (order + active) if it exists ──────────
-  const saved = loadWfState();
-  if (saved && saved.length > 0) {
-    const nav    = wfPlacements.find(p => p.key === 'nav');
-    const hero   = wfPlacements.find(p => p.key === 'hero-banner');
-    const footer = wfPlacements.find(p => p.key === 'footer');
-    const currentMap = {};
-    wfPlacements.filter(p => !p.locked).forEach(p => { currentMap[p.key] = p; });
-    const savedKeys = new Set(saved.map(s => s.key));
-    const newKeys = wfPlacements.filter(p => !p.locked && !savedKeys.has(p.key));
-    wfPlacements = [
-      nav, hero,
-      ...saved.map(s => {
-        const cur = currentMap[s.key];
-        if (!cur) return null;
-        return { ...cur, active: s.active, customHtml: s.customHtml || cur.customHtml };
-      }).filter(Boolean),
-      ...newKeys,
-      footer
-    ];
-  }
-
   renderWfPlacements();
   document.getElementById('wfOverlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  // Show output area, hide empty state
-  document.getElementById('wfOutput').style.display = 'block';
+  // Reset output
+  document.getElementById('wfOutput').style.display = 'none';
+  document.getElementById('wfOutput').innerHTML = '';
+  document.getElementById('wfEmptyState').style.display = 'block';
   document.getElementById('wfJpgBtn').style.display = 'none';
   document.getElementById('wfGenStatus').textContent = '';
-  const emptyEl2 = document.getElementById('wfEmptyState');
-  if (emptyEl2) emptyEl2.style.display = 'none';
-
-  // ── Auto-generate immediately ───────────────────────────────────────────────
-  generateWireframe();
+  const driveBtn = document.getElementById('wfViewInDriveBtn');
+  if (driveBtn) { driveBtn.style.display = 'none'; driveBtn.href = '#'; }
+  // Reset to initial Generate state
+  const genBtn = document.getElementById('wfGenerateBtn');
+  const regenBtn = document.getElementById('wfRegenerateBtn');
+  if (genBtn) { genBtn.style.display = 'flex'; genBtn.disabled = false; genBtn.style.opacity = '1'; }
+  if (regenBtn) { regenBtn.style.display = 'none'; }
+  // Sync "Presented by" from calculator — true if any active package has it active
+  wfShowPresentedBy = (function(){
+    if(typeof pkgs==='undefined'||!pkgs.length) return true;
+    return pkgs.some(function(pkg){
+      return (pkg.inclusions||[]).some(function(inc){
+        return inc.name==='Presented by' && inc.active!==false;
+      });
+    });
+  })();
+  wfCurrentHtml = '';
   wfChatHistory = [];
 }
 
@@ -1953,7 +1923,7 @@ function renderWfPlacements() {
             <span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--border);border-radius:3px;padding:1px 5px;flex-shrink:0;">Default</span>
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:1px;line-height:1.3;opacity:.7;">${p.desc}</div>
-
+          ${p.key === 'hero-banner' ? `<label style="display:inline-flex;align-items:center;gap:5px;margin-top:5px;cursor:pointer;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;"><input type="checkbox" ${wfShowPresentedBy?'checked':''} onchange="wfShowPresentedBy=this.checked;" style="cursor:pointer;"> Presented by lockup</label>` : ''}
         </div>
       `;
       list.appendChild(el);
@@ -2021,7 +1991,6 @@ function wfToggle(idx) {
   if (wfPlacements[idx].locked) return;
   wfPlacements[idx].active = !wfPlacements[idx].active;
   renderWfPlacements();
-  generateWireframe();
 }
 
 // ── Drag-to-reorder ───────────────────────────────────
@@ -2043,7 +2012,6 @@ function wfDrop(e) {
   const moved = wfPlacements.splice(wfDragSrc, 1)[0];
   wfPlacements.splice(targetIdx, 0, moved);
   renderWfPlacements();
-  generateWireframe();
   return false;
 }
 function wfDragEnd(e) {
@@ -2125,9 +2093,6 @@ const WF_SHARED_CSS = `<style>
 .wf-dark .wf-h1[contenteditable]:hover{border-bottom-color:rgba(255,255,255,.2);}
 .wf-h1[contenteditable]:focus{border-bottom-color:#888;}
 .wf-dark .wf-h1[contenteditable]:focus{border-bottom-color:rgba(255,255,255,.5);}
-[contenteditable]:not(.wf-h1):not(.wf-h2){outline:none;cursor:text;border-bottom:1px dashed transparent;transition:border-color .15s;}
-[contenteditable]:not(.wf-h1):not(.wf-h2):hover{border-bottom-color:rgba(0,0,0,.12);}
-[contenteditable]:not(.wf-h1):not(.wf-h2):focus{border-bottom-color:#aaa;}
 .wf-assist-btn{position:absolute;top:50%;transform:translateY(-50%);right:-22px;width:16px;height:16px;border-radius:50%;border:1.5px solid #ccc;background:#fff;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:9px;font-weight:700;color:#bbb;line-height:1;z-index:10;transition:all .15s;}
 .wf-editable-wrap:hover .wf-assist-btn{display:flex;}
 .wf-assist-btn:hover{border-color:#888;color:#444;background:#f5f5f5;}
@@ -2225,7 +2190,7 @@ function tplNav(ctx) {
 }
 
 function tplFooter(ctx) {
-  const hub  = ctx.hub ? toTitleCase(ctx.hub.trim()) + ' Co-op Hub' : 'Co-op Hub';
+  const hub  = ctx.hub     || 'Co-op Hub';
   const sta  = ctx.station || 'Station';
   return `
 <div class="wf-footer">
@@ -2244,52 +2209,28 @@ function tplFooter(ctx) {
 </div>`;
 }
 
-function tplHero(ctx, showPresentedBy) {
+function tplHero(ctx) {
   const h       = wfHeading(ctx,'hero');
+  // Use tagline if available, then first sentence of desc, then empty
   const subhead = ctx.tagline
     || (ctx.desc ? ctx.desc.split('.')[0].trim() + '.' : '');
-  const pbLockup = showPresentedBy ? `
-    <div style="border-top:1px solid #444;margin-top:36px;padding-top:24px;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;">
-      <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#aaa;font-weight:700;" contenteditable="true" spellcheck="false">Presented by</div>
-      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
-        ${[1,2,3].map(n=>`<div style="width:110px;height:44px;border:1.5px dashed #666;background:rgba(255,255,255,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;"><div style="width:36px;height:2px;background:#666;border-radius:1px;"></div><div style="font-size:7px;color:#888;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">LOGO ${n}</div></div>`).join('')}
-      </div>
-    </div>` : '';
   return `
 <div class="wf-section wf-dark" style="padding:0;min-height:440px;position:relative;display:flex;flex-direction:column;">
   <div class="wf-img" style="position:absolute;inset:0;opacity:.14;"></div>
   <div style="position:relative;z-index:1;padding:72px 48px 52px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
     <h1 class="wf-h1" contenteditable="true" spellcheck="false" style="font-size:44px;max-width:600px;margin-bottom:14px;">${h.h1}</h1>
     <p class="wf-h2" contenteditable="true" spellcheck="false" style="max-width:420px;margin-bottom:36px;font-size:15px;color:#888;">${subhead}</p>
-    <div style="display:flex;gap:12px;justify-content:center;">
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:52px;">
       <div class="wf-btn wf-btn-fill wf-btn-sm" style="border-color:#fff;background:#fff;color:#1a1a1a;">Explore Now</div>
       <div class="wf-btn wf-btn-sm" style="border-color:#666;color:#999;">Learn More</div>
     </div>
-    ${pbLockup}
-  </div>
-</div>`;
-}
-
-function tplSponsorInfoCard(ctx) {
-  const hub = ctx.hub ? ctx.hub.trim() : 'Your Hub';
-  const card = (n) => `
-    <div style="display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid #e8e8e8;background:#fff;">
-      <div class="wf-img" style="width:80px;height:80px;flex-shrink:0;"><span class="wf-img-lbl" style="font-size:8px;">IMG</span></div>
-      <div style="flex:1;">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1a1a1a;margin-bottom:5px;" contenteditable="true" spellcheck="false">Sponsor Name ${n}</div>
-        <div style="font-size:11px;color:#888;line-height:1.5;margin-bottom:8px;" contenteditable="true" spellcheck="false">Short description of sponsor — up to 100 words, relevant to the hub topic and audience.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <div class="wf-btn wf-btn-sm" style="font-size:9px;padding:4px 10px;border-color:#ccc;color:#888;">Website ↗</div>
-          <div class="wf-btn wf-btn-sm" style="font-size:9px;padding:4px 10px;border-color:#ccc;color:#888;">Contact</div>
-        </div>
+    ${wfShowPresentedBy ? `<div style="border-top:1px solid #555;padding-top:28px;width:100%;display:flex;flex-direction:column;align-items:center;gap:16px;">
+      <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#bbb;font-weight:700;">Presented by</div>
+      <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;">
+        ${[1,2,3].map(n=>'<div style="width:110px;height:44px;border:1.5px dashed #999;background:rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;"><div style="width:40px;height:2px;background:#999;border-radius:1px;"></div><div style="font-size:8px;color:#aaa;letter-spacing:.1em;text-transform:uppercase;font-weight:600;">SPONSOR LOGO '+n+'</div></div>').join('')}
       </div>
-    </div>`;
-  return `
-<div class="wf-section">
-  <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">SPONSOR INFORMATION</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">Learn more about each sponsor — click to visit their site or get in touch.</p>
-  <div style="display:flex;flex-direction:column;gap:12px;">${[1,2,3].map(card).join('')}</div>
+    </div>` : ''}
+  </div>
 </div>`;
 }
 
@@ -2300,14 +2241,14 @@ function tplFeaturedStories(ctx) {
       <div class="wf-img" style="height:160px;"><span class="wf-img-lbl">[ IMAGE ]</span></div>
       <div class="wf-card-body">
         <div class="wf-tag">Sponsored</div>
-        <div class="wf-card-hed" contenteditable="true" spellcheck="false">Headline for Sponsored Story #${n}</div>
+        <div class="wf-card-hed">Headline for Sponsored Story #${n}</div>
         <div class="wf-lorem"></div><div class="wf-lorem wf-sm"></div>
       </div>
     </div>`;
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
   <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
   <div class="wf-grid-2">${[1,2,3,4].map(card).join('')}</div>
 </div>`;
@@ -2323,8 +2264,8 @@ function tplFeaturedListings(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-grid-4" style="margin-bottom:16px;">${Array(4).fill(0).map(card).join('')}</div>
   <div class="wf-grid-4">${Array(4).fill(0).map(card).join('')}</div>
 </div>`;
@@ -2337,15 +2278,15 @@ function tplReadMore(ctx) {
       <div class="wf-img" style="height:140px;"><span class="wf-img-lbl">[ IMAGE ]</span></div>
       <div class="wf-card-body">
         <div class="wf-tag">Editorial</div>
-        <div class="wf-card-hed" contenteditable="true" spellcheck="false">Headline for Editorial Story #${n}</div>
+        <div class="wf-card-hed">Headline for Editorial Story #${n}</div>
         <div class="wf-lorem"></div><div class="wf-lorem wf-sm"></div>
       </div>
     </div>`;
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-grid-2">${[1,2].map(card).join('')}</div>
 </div>`;
 }
@@ -2371,8 +2312,8 @@ function tplQaFaq(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div>
     ${items.map((q,i)=>`
     <div class="wf-accordion-item" ${i===0?'style="border-top:1px solid #e8e8e8;"':''}>
@@ -2394,8 +2335,8 @@ function tplDirectory(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-grid-4" style="margin-bottom:16px;">${Array(4).fill(0).map(logo).join('')}</div>
   <div class="wf-grid-4">${Array(4).fill(0).map(logo).join('')}</div>
 </div>`;
@@ -2407,8 +2348,8 @@ function tplIeMap(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-map-wrap" style="grid-template-columns:300px 1fr;">
     <div class="wf-map-list" style="border-left:none;border-right:1px solid #e8e8e8;">
       ${Array(5).fill(0).map((_,i)=>`
@@ -2435,8 +2376,8 @@ function tplIeUpcomingEvents(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-grid-3" style="margin-bottom:16px;">
     ${days.slice(0,3).map((d,i)=>`
     <div class="wf-event-card">
@@ -2467,8 +2408,8 @@ function tplIeQuiz(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;padding:28px;">
     <div style="font-size:10px;color:#bbb;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;">Question 1 of 5</div>
     <div style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:20px;text-transform:uppercase;letter-spacing:.03em;">How would you describe your needs?</div>
@@ -2492,8 +2433,8 @@ function tplIeCalculator(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;">
     <div>
       ${['Your Budget','Down Payment','Loan Term','ZIP Code'].map(lbl=>`
@@ -2525,8 +2466,8 @@ function tplIeTimeline(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-ie" style="padding:36px 40px;align-items:flex-start;">
     <div class="wf-timeline" style="width:100%;">
       ${years.map((y,i)=>`
@@ -2546,8 +2487,8 @@ function tplIeInfoCards(ctx) {
   return `
 <div class="wf-section">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-grid-4">
     ${[1,2,3,4].map((n,i)=>`
     <div class="wf-info-card" style="${i===1?'background:#1a1a1a;border-color:#1a1a1a;':''}">
@@ -2567,8 +2508,8 @@ function tplIeShoppableImages(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;">
     <div class="wf-shop-wrap">
       <div class="wf-img" style="height:340px;width:100%;"><span class="wf-img-lbl">[ SHOPPABLE IMAGE ]</span></div>
@@ -2616,8 +2557,8 @@ function tplIeIllustrations(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div style="border:1px solid #e0e0e0;background:#fff;padding:28px;">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
       ${[120,90,100].map(ht=>`<div class="wf-img" style="height:${ht}px;"><span class="wf-img-lbl">[ GRAPHIC ]</span></div>`).join('')}
@@ -2652,8 +2593,8 @@ function tplIeShoppableVideo(ctx) {
     </div>
   </div>
   <div class="wf-section" style="padding:20px 48px;">
-    <h2 class="wf-h1" style="font-size:18px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-    <p class="wf-h2" style="margin-bottom:0;" contenteditable="true" spellcheck="false">${h.h2}</p>
+    <h2 class="wf-h1" style="font-size:18px;">${h.h1}</h2>
+    <p class="wf-h2" style="margin-bottom:0;">${h.h2}</p>
   </div>
 </div>`;
 }
@@ -2663,8 +2604,8 @@ function tplIeAnimatedVideo(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div style="position:relative;border:1px solid #e0e0e0;background:#fff;">
     <div class="wf-img" style="height:320px;">
       <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
@@ -2695,7 +2636,7 @@ function tplIeShowreel(ctx) {
   <div class="wf-ie" style="padding:0;min-height:320px;position:relative;">
     <div class="wf-img" style="width:100%;height:320px;"></div>
     <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:32px 48px 24px;">
-      <h2 class="wf-h1" style="font-size:22px;color:#fff;" contenteditable="true" spellcheck="false">${h.h1}</h2>
+      <h2 class="wf-h1" style="font-size:22px;color:#fff;">${h.h1}</h2>
       <p style="color:#666;font-size:12px;margin-top:6px;">${h.h2}</p>
     </div>
     <div style="position:absolute;top:50%;right:48px;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;">
@@ -2717,8 +2658,8 @@ function tplIeChatbot(ctx) {
   return `
 <div class="wf-section wf-alt">
   <div class="wf-divider"></div>
-  <h2 class="wf-h1" style="font-size:20px;" contenteditable="true" spellcheck="false">${h.h1}</h2>
-  <p class="wf-h2" contenteditable="true" spellcheck="false">${h.h2}</p>
+  <h2 class="wf-h1" style="font-size:20px;">${h.h1}</h2>
+  <p class="wf-h2">${h.h2}</p>
   <div class="wf-chat-window">
     <div class="wf-chat-header">
       <div class="wf-chat-avatar"></div>
@@ -2767,7 +2708,6 @@ const WF_RENDER = {
   'nav':                  tplNav,
   'footer':               tplFooter,
   'hero-banner':          tplHero,
-  'sponsor-info-card':    tplSponsorInfoCard,
   'featured-stories':     tplFeaturedStories,
   'featured-listings':    tplFeaturedListings,
   'read-more':            tplReadMore,
@@ -2801,26 +2741,25 @@ function generateWireframe() {
     return;
   }
 
+  // Disable whichever button is currently visible
+  const regenBtnActive = document.getElementById('wfRegenerateBtn');
+  const btn = regenBtnActive && regenBtnActive.style.display !== 'none'
+    ? regenBtnActive
+    : document.getElementById('wfGenerateBtn');
   const statusEl = document.getElementById('wfGenStatus');
 
-  const emptyEl = document.getElementById('wfEmptyState'); if (emptyEl) emptyEl.style.display = 'none';
+  document.getElementById('wfEmptyState').style.display = 'none';
   const outputEl = document.getElementById('wfOutput');
   outputEl.style.display = 'block';
 
   const activePlacements = wfPlacements.filter(p => p.active);
-  // Check if "Presented by" is active — it renders inside the hero, not as its own section
-  const showPresentedBy = activePlacements.some(p => p.key === 'presented-by');
   let sectionsHtml = '';
   for (const p of activePlacements) {
-    // Skip presented-by as standalone section — it's injected into the hero
-    if (p.key === 'presented-by') continue;
     if (p.custom && p.customHtml) {
+      // Wrap pasted HTML in the same section constraint all templates use
       sectionsHtml += `<div style="width:100%;max-width:900px;overflow:hidden;border-bottom:1px solid #e8e8e8;">${p.customHtml}</div>`;
     } else if (p.custom) {
       sectionsHtml += tplCustomPlaceholder(p, ctx);
-    } else if (p.key === 'hero-banner') {
-      // Pass showPresentedBy into hero so it can render the lockup inside
-      sectionsHtml += tplHero(ctx, showPresentedBy);
     } else {
       const fn = WF_RENDER[p.key];
       sectionsHtml += fn ? fn(ctx) : tplCustomPlaceholder(p, ctx);
@@ -2838,8 +2777,11 @@ function generateWireframe() {
   statusEl.style.color = 'var(--good)';
   document.getElementById('wfJpgBtn').style.display = 'inline-flex';
 
-  // Save state so it persists across calculator round-trips
-  saveWfState();
+  // After first generation: hide Generate, show Regenerate
+  const genBtn = document.getElementById('wfGenerateBtn');
+  const regenBtn = document.getElementById('wfRegenerateBtn');
+  if (genBtn) genBtn.style.display = 'none';
+  if (regenBtn) { regenBtn.style.display = 'flex'; regenBtn.disabled = false; regenBtn.style.opacity = '1'; }
 }
 
 function tplCustomPlaceholder(p, ctx) {
@@ -3015,7 +2957,12 @@ Requirements:
   }, 600);
 }
 
-function resetWfGenerateBtn() { /* buttons removed — auto-generates on all interactions */ }
+function resetWfGenerateBtn() {
+  const btn = document.getElementById('wfGenerateBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="8" height="2" rx=".7" fill="currentColor" opacity=".7"/><rect x="3" y="6.5" width="5" height="1.5" rx=".5" fill="currentColor" opacity=".5"/><rect x="3" y="9" width="3" height="1.5" rx=".5" fill="currentColor" opacity=".35"/></svg> Regenerate`;
+}
 
 // ════════════════════════════════════════════════════
 // JPG EXPORT → GDRIVE
@@ -3126,14 +3073,11 @@ function markExportSuccess(btn, statusEl, v, driveUrl) {
 }
 
 // ════════════════════════════════════════════════════
-// CALCULATOR → GOOGLE DOC (from template)
-// ════════════════════════════════════════════════════
-
 async function exportCalcDoc() {
   const btn      = document.getElementById('calcDriveBtn');
   const statusEl = document.getElementById('calcDriveStatus');
   const origHtml = btn.innerHTML;
-  btn.textContent = 'Saving…';
+  btn.textContent = 'Saving\u2026';
   btn.disabled = true;
   statusEl.textContent = '';
 
@@ -3150,18 +3094,16 @@ async function exportCalcDoc() {
 
   const SCRIPT_URL = localStorage.getItem('appsScriptUrl') || '';
   if (!SCRIPT_URL) {
-    alert('Apps Script URL not set — click the chain icon to configure.');
+    alert('Apps Script URL not set \u2014 click the chain icon to configure.');
     btn.innerHTML = origHtml; btn.disabled = false; return;
   }
 
-  // Filename: Station-HubName-Program-Overview_VN
   const hubSlug  = hub.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
   const staSlug  = sta.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
   const vKey     = 'docVersion_' + hub + '_' + sta;
   const ver      = parseInt(localStorage.getItem(vKey) || '0') + 1;
   const filename = staSlug + '-' + hubSlug + '-Program-Overview_V' + ver;
 
-  // Build cost
   let buildCost = 0;
   if      (buildT === 'new')        buildCost = 10000;
   else if (buildT === 'refresh')    buildCost = 3500;
@@ -3196,7 +3138,7 @@ async function exportCalcDoc() {
   };
 
   try {
-    statusEl.textContent = 'Creating doc…';
+    statusEl.textContent = 'Creating doc\u2026';
     statusEl.style.color = 'var(--muted)';
     const resp   = await fetch(SCRIPT_URL, {
       method: 'POST', headers: {'Content-Type': 'text/plain'},
@@ -3207,7 +3149,7 @@ async function exportCalcDoc() {
       localStorage.setItem(vKey, String(ver));
       btn.innerHTML = origHtml; btn.disabled = false;
       btn.style.color = 'var(--good)'; btn.style.borderColor = 'var(--good)';
-      statusEl.textContent = 'Saved — V' + ver + ' ✓';
+      statusEl.textContent = 'Saved \u2014 V' + ver + ' \u2713';
       statusEl.style.color = 'var(--good)';
       window.open(result.docUrl, '_blank');
       setTimeout(() => { btn.style.color=''; btn.style.borderColor=''; statusEl.textContent=''; }, 5000);
@@ -3219,6 +3161,111 @@ async function exportCalcDoc() {
     statusEl.textContent = 'Error: ' + err.message;
     statusEl.style.color = 'var(--warn)';
     console.error('Doc export error:', err);
+  }
+}
+
+
+// CALCULATOR PDF → GDRIVE
+// ════════════════════════════════════════════════════
+
+async function exportCalcPdf() {
+  const btn = document.getElementById('calcDriveBtn');
+  const statusEl = document.getElementById('calcDriveStatus');
+  const origHtml = btn.innerHTML;
+  btn.textContent = 'Capturing…';
+  btn.disabled = true;
+  statusEl.textContent = '';
+
+  const hub = (document.getElementById('hubName') || {}).value || 'Hub';
+  const sta = (document.getElementById('station') || {}).value || 'Station';
+  const hubSlug = hub.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
+  const staSlug = sta.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
+
+  const SCRIPT_URL = localStorage.getItem('appsScriptUrl') || '';
+  if (!SCRIPT_URL) {
+    btn.innerHTML = origHtml;
+    btn.disabled = false;
+    statusEl.textContent = 'Apps Script URL not set — click ⛓ to configure.';
+    statusEl.style.color = 'var(--warn)';
+    return;
+  }
+
+  try {
+    // Load html2pdf.js if not already loaded
+    if (!window.html2pdf) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    statusEl.textContent = 'Rendering PDF…';
+    statusEl.style.color = 'var(--muted)';
+
+    // Capture the main calculator page (print styles handle formatting)
+    const target = document.body;
+
+    const pdfBlob = await html2pdf()
+      .set({
+        margin: [8, 8, 8, 8],
+        filename: `${staSlug}-${hubSlug}-Calculator.pdf`,
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1100 },
+        jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' },
+        pagebreak: { mode: ['avoid-all', 'css'] }
+      })
+      .from(target)
+      .outputPdf('blob');
+
+    // Convert blob to base64
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    // Version counter — shared across sessions
+    const vKey = 'calcVersion_' + hub + '_' + sta;
+    const currentV = parseInt(localStorage.getItem(vKey) || '0') + 1;
+    const filename = staSlug + '-' + hubSlug + '-Calculator_V' + currentV + '.pdf';
+    const deckId = localStorage.getItem('lastDeckId') || '';
+
+    statusEl.textContent = 'Uploading to Drive…';
+
+    const payload = { calc_export: true, filename, pdfBase64: base64, deckId, hubName: hub, station: sta };
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload),
+      redirect: 'follow'
+    });
+
+    // Treat any completed response as success — PDF was captured and sent
+    let result = {};
+    try { result = await resp.json(); } catch(e) {}
+
+    localStorage.setItem(vKey, String(currentV));
+    btn.innerHTML = origHtml;
+    btn.disabled = false;
+    btn.style.color = 'var(--good)';
+    btn.style.borderColor = 'var(--good)';
+    statusEl.textContent = 'Saved to Drive — V' + currentV;
+    statusEl.style.color = 'var(--good)';
+    setTimeout(() => {
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      statusEl.textContent = '';
+    }, 4000);
+
+  } catch (err) {
+    btn.innerHTML = origHtml;
+    btn.disabled = false;
+    statusEl.textContent = 'Export failed: ' + err.message;
+    statusEl.style.color = 'var(--warn)';
+    console.error('Calc PDF export error:', err);
   }
 }
 
