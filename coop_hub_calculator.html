@@ -651,8 +651,7 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--na
         </a>
       </div>
 
-      <!-- Print PDF always right on row 1 -->
-      <button class="btn btn-s" onclick="printVersioned()" style="font-size:12px;padding:9px 16px;">Print / PDF</button>
+
     </div>
 
     <!-- Thin divider between rows -->
@@ -691,9 +690,9 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--na
     <!-- ROW 3: Calculator save to Drive -->
     <div style="display:flex;align-items:center;padding:10px 0 14px;gap:8px;">
       <span style="font-family:'Barlow',sans-serif;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);min-width:72px;">Calculator</span>
-      <button id="calcDriveBtn" onclick="exportCalcPdf()" style="display:none;align-items:center;gap:7px;padding:9px 16px;background:transparent;color:var(--muted);border:2px solid var(--border);border-radius:6px;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--navy)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v7.5M3.5 6l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10v1.5h10V10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Save to Drive
+      <button id="calcDriveBtn" onclick="exportCalcDoc()" style="display:none;align-items:center;gap:7px;padding:9px 16px;background:transparent;color:var(--muted);border:2px solid var(--border);border-radius:6px;font-family:'Barlow',sans-serif;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--navy)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 1.5h9v10H2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Save as Google Doc
       </button>
       <span id="calcDriveStatus" style="font-size:11px;color:var(--muted);font-style:italic;"></span>
     </div>
@@ -3127,107 +3126,99 @@ function markExportSuccess(btn, statusEl, v, driveUrl) {
 }
 
 // ════════════════════════════════════════════════════
-// CALCULATOR PDF → GDRIVE
+// CALCULATOR → GOOGLE DOC (from template)
 // ════════════════════════════════════════════════════
 
-async function exportCalcPdf() {
-  const btn = document.getElementById('calcDriveBtn');
+async function exportCalcDoc() {
+  const btn      = document.getElementById('calcDriveBtn');
   const statusEl = document.getElementById('calcDriveStatus');
   const origHtml = btn.innerHTML;
-  btn.textContent = 'Capturing…';
+  btn.textContent = 'Saving…';
   btn.disabled = true;
   statusEl.textContent = '';
 
-  const hub = (document.getElementById('hubName') || {}).value || 'Hub';
-  const sta = (document.getElementById('station') || {}).value || 'Station';
-  const hubSlug = hub.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
-  const staSlug = sta.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
+  const hub    = (document.getElementById('hubName')   ||{}).value || '';
+  const sta    = (document.getElementById('station')   ||{}).value || '';
+  const div    = (document.getElementById('division')  ||{}).value || '';
+  const launch = (document.getElementById('launchDate')||{}).value || '';
+  const promoL = parseFloat((document.getElementById('promoLength')||{}).value) || 6;
+  const buildT = (document.getElementById('buildType') ||{}).value || 'new';
+  const hifi   = document.getElementById('hifi')        ? document.getElementById('hifi').checked        : false;
+  const sep    = document.getElementById('sepLineItem') ? document.getElementById('sepLineItem').checked : false;
+  const hubDesc = (document.getElementById('promptHubDesc')||{}).value
+               || localStorage.getItem('promptHubDesc') || '';
 
   const SCRIPT_URL = localStorage.getItem('appsScriptUrl') || '';
   if (!SCRIPT_URL) {
-    btn.innerHTML = origHtml;
-    btn.disabled = false;
-    statusEl.textContent = 'Apps Script URL not set — click ⛓ to configure.';
-    statusEl.style.color = 'var(--warn)';
-    return;
+    alert('Apps Script URL not set — click the chain icon to configure.');
+    btn.innerHTML = origHtml; btn.disabled = false; return;
   }
 
+  // Filename: Station-HubName-Program-Overview_VN
+  const hubSlug  = hub.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
+  const staSlug  = sta.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'-');
+  const vKey     = 'docVersion_' + hub + '_' + sta;
+  const ver      = parseInt(localStorage.getItem(vKey) || '0') + 1;
+  const filename = staSlug + '-' + hubSlug + '-Program-Overview_V' + ver;
+
+  // Build cost
+  let buildCost = 0;
+  if      (buildT === 'new')        buildCost = 10000;
+  else if (buildT === 'refresh')    buildCost = 3500;
+  else if (buildT === 'discounted') buildCost = parseFloat((document.getElementById('customBuild')||{}).value) || 0;
+  if (hifi) buildCost = Math.max(0, buildCost - 1500);
+
+  const deckId = localStorage.getItem('lastDeckId') || '';
+
+  const pkgData = (typeof pkgs !== 'undefined' ? pkgs : []).map(p => ({
+    name:           p.name,
+    layout:         p.layout,
+    minSponsors:    p.minSponsors,
+    retail:         p.retail || 0,
+    impressions:    p.impressions || 0,
+    engagements:    p.engagements || 0,
+    dtsImpressions: p.dtsImpressions || 0,
+    hasDTS:         p.hasDTS || false,
+    seriesActive:   p.seriesActive || false,
+    seriesCount:    p.seriesCount  || 1,
+    ieActive:       p.ieActive     || false,
+    ieType:         p.ieType       || '',
+    pkgAddons:      p.pkgAddons    || {},
+    inclusions:     (p.inclusions  || []).map(inc => ({ name: inc.name, active: inc.active !== false }))
+  }));
+
+  const payload = {
+    calc_doc_export: true,
+    filename, deckId, hubName: hub, station: sta, division: div,
+    launchDate: launch, promoLength: promoL, buildCost,
+    hifi, sepLineItem: sep, hubDesc,
+    packages: pkgData
+  };
+
   try {
-    // Load html2pdf.js if not already loaded
-    if (!window.html2pdf) {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
-
-    statusEl.textContent = 'Rendering PDF…';
+    statusEl.textContent = 'Creating doc…';
     statusEl.style.color = 'var(--muted)';
-
-    // Capture the main calculator page (print styles handle formatting)
-    const target = document.body;
-
-    const pdfBlob = await html2pdf()
-      .set({
-        margin: [8, 8, 8, 8],
-        filename: `${staSlug}-${hubSlug}-Calculator.pdf`,
-        image: { type: 'jpeg', quality: 0.92 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 1100 },
-        jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' },
-        pagebreak: { mode: ['avoid-all', 'css'] }
-      })
-      .from(target)
-      .outputPdf('blob');
-
-    // Convert blob to base64
-    const base64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result.split(',')[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(pdfBlob);
+    const resp   = await fetch(SCRIPT_URL, {
+      method: 'POST', headers: {'Content-Type': 'text/plain'},
+      body: JSON.stringify(payload), redirect: 'follow'
     });
-
-    // Version counter — shared across sessions
-    const vKey = 'calcVersion_' + hub + '_' + sta;
-    const currentV = parseInt(localStorage.getItem(vKey) || '0') + 1;
-    const filename = staSlug + '-' + hubSlug + '-Calculator_V' + currentV + '.pdf';
-    const deckId = localStorage.getItem('lastDeckId') || '';
-
-    statusEl.textContent = 'Uploading to Drive…';
-
-    const payload = { calc_export: true, filename, pdfBase64: base64, deckId, hubName: hub, station: sta };
-    const resp = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload),
-      redirect: 'follow'
-    });
-
-    // Treat any completed response as success — PDF was captured and sent
-    let result = {};
-    try { result = await resp.json(); } catch(e) {}
-
-    localStorage.setItem(vKey, String(currentV));
-    btn.innerHTML = origHtml;
-    btn.disabled = false;
-    btn.style.color = 'var(--good)';
-    btn.style.borderColor = 'var(--good)';
-    statusEl.textContent = 'Saved to Drive — V' + currentV;
-    statusEl.style.color = 'var(--good)';
-    setTimeout(() => {
-      btn.style.color = '';
-      btn.style.borderColor = '';
-      statusEl.textContent = '';
-    }, 4000);
-
-  } catch (err) {
-    btn.innerHTML = origHtml;
-    btn.disabled = false;
-    statusEl.textContent = 'Export failed: ' + err.message;
+    const result = await resp.json();
+    if (result.docUrl) {
+      localStorage.setItem(vKey, String(ver));
+      btn.innerHTML = origHtml; btn.disabled = false;
+      btn.style.color = 'var(--good)'; btn.style.borderColor = 'var(--good)';
+      statusEl.textContent = 'Saved — V' + ver + ' ✓';
+      statusEl.style.color = 'var(--good)';
+      window.open(result.docUrl, '_blank');
+      setTimeout(() => { btn.style.color=''; btn.style.borderColor=''; statusEl.textContent=''; }, 5000);
+    } else {
+      throw new Error(result.error || 'No doc URL returned');
+    }
+  } catch(err) {
+    btn.innerHTML = origHtml; btn.disabled = false;
+    statusEl.textContent = 'Error: ' + err.message;
     statusEl.style.color = 'var(--warn)';
-    console.error('Calc PDF export error:', err);
+    console.error('Doc export error:', err);
   }
 }
 
